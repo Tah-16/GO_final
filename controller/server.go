@@ -34,5 +34,6 @@ func StartServer() {
 	})
 	CustomerController(router, db)
 	ProductController(router, db)
+	CartController(router, db)
 	router.Run(":8050")
 }

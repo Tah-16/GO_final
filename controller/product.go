@@ -14,6 +14,7 @@ func ProductController(router *gin.Engine, db *gorm.DB) {
 	routers := router.Group("/Product")
 	{
 		routers.GET("/searchproducts", func(c *gin.Context) { searchProducts(c, db) })
+		routers.POST("/addproducttoCart", func(c *gin.Context) { addProductToCart(c, db) })
 	}
 }
 
@@ -62,4 +63,56 @@ func searchProducts(c *gin.Context, p_db *gorm.DB) {
 
 	// ส่งผลลัพธ์สินค้ากลับไป
 	c.JSON(http.StatusOK, gin.H{"products": products})
+}
+func addProductToCart(c *gin.Context, db *gorm.DB) {
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection is not initialized"})
+		return
+	}
+
+	// รับข้อมูลจากคำขอ
+	var req dto.AddToCartRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	// ค้นหารถเข็นที่มีชื่อที่กำหนดโดยลูกค้า
+	var cart model.Cart
+	if err := db.Where("customer_id = ? AND cart_name = ?", req.CustomerID, req.CartName).First(&cart).Error; err != nil {
+		// หากไม่พบรถเข็น ให้สร้างรถเข็นใหม่
+		cart = model.Cart{
+			CustomerID: req.CustomerID,
+			CartName:   req.CartName,
+		}
+		if err := db.Create(&cart).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create cart"})
+			return
+		}
+	}
+
+	// ค้นหาสินค้าในตะกร้าว่ามีสินค้าเดียวกันหรือไม่
+	var cartItem model.CartItem
+	if err := db.Where("cart_id = ? AND product_id = ?", cart.CartID, req.ProductID).First(&cartItem).Error; err == nil {
+		// หากมีสินค้าแล้ว ให้เพิ่มจำนวนสินค้า
+		cartItem.Quantity += req.Quantity
+		if err := db.Save(&cartItem).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item quantity"})
+			return
+		}
+	} else if err := db.Where("cart_id = ?", cart.CartID).First(&cartItem).Error; err != nil {
+		// หากไม่มีสินค้าในตะกร้า ให้เพิ่มสินค้าใหม่
+		cartItem = model.CartItem{
+			CartID:    cart.CartID,
+			ProductID: req.ProductID,
+			Quantity:  req.Quantity,
+		}
+		if err := db.Create(&cartItem).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add product to cart"})
+			return
+		}
+	}
+
+	// ส่งผลลัพธ์สำเร็จ
+	c.JSON(http.StatusOK, gin.H{"message": "Product added to cart successfully"})
 }
