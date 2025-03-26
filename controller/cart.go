@@ -10,7 +10,7 @@ import (
 )
 
 func CartController(router *gin.Engine, db *gorm.DB) {
-	routers := router.Group("/Product")
+	routers := router.Group("/cart")
 	{
 		routers.GET("/getcarts", func(c *gin.Context) { getAllCarts(c, db) })
 	}
@@ -20,14 +20,6 @@ func getAllCarts(c *gin.Context, db *gorm.DB) {
 	customerID := c.Query("customer_id")
 	fmt.Println("Customer ID:", customerID)
 
-	var cartst []model.Cart
-	if err := db.Where("customer_id = ?", customerID).Find(&cartst).Error; err != nil {
-		fmt.Println("Error fetching carts:", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Carts not found"})
-		return
-	}
-
-	fmt.Println("Carts found:", cartst)
 	var carts []model.Cart
 	if err := db.Where("customer_id = ?", customerID).Find(&carts).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Carts not found"})
