@@ -33,6 +33,6 @@ func StartServer() {
 		})
 	})
 	CustomerController(router, db)
-	ProductController(router)
+	ProductController(router, db)
 	router.Run(":8050")
 }
